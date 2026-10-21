@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { AssetSymbol, Candle, StrategyConfig, Timeframe, Trade } from '../../types';
+import { AssetSymbol, Candle, StrategyConfig, Timeframe, Trade, TradeDirection } from '../../types';
 import { ASSETS, formatPrice } from '../../data/assets';
 import { TradingViewChart } from './TradingViewChart';
+import { NextTradeOpportunityRadar } from '../learning/NextTradeOpportunityRadar';
 import {
   CandlestickChart,
   BarChart3,
@@ -25,6 +26,15 @@ interface TradingViewModuleViewProps {
   trades: Trade[];
   onUpdateConfig: (updated: Partial<StrategyConfig>) => void;
   onRunSimulation?: () => void;
+  currentPrice: number;
+  onTriggerPlannedTrade: (
+    direction: TradeDirection,
+    entryPrice: number,
+    slPrice: number,
+    tpPrice: number,
+    reason: string,
+    hinglish: string
+  ) => void;
 }
 
 export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
@@ -33,6 +43,8 @@ export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
   trades,
   onUpdateConfig,
   onRunSimulation,
+  currentPrice,
+  onTriggerPlannedTrade,
 }) => {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
 
@@ -122,6 +134,14 @@ export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
         trades={trades}
         activeTrade={latestTrade}
         height={520}
+      />
+
+      {/* Next Trade Opportunity Radar & Decision Engine */}
+      <NextTradeOpportunityRadar
+        config={config}
+        currentPrice={currentPrice}
+        candles={candles}
+        onTriggerPlannedTrade={onTriggerPlannedTrade}
       />
 
       {/* Strategy Overlay Trade Stats & Legend Details */}

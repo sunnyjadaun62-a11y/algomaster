@@ -323,6 +323,89 @@ export function App() {
     [addBotLog, config, currentPrice, paperAccount.freeMargin, showToast]
   );
 
+  // Trigger Specific Planned Trade with Pre-Calculated SL/TP and Full Learning Thesis
+  const handleTriggerPlannedTrade = useCallback(
+    (
+      direction: TradeDirection,
+      entryPrice: number,
+      slPrice: number,
+      tpPrice: number,
+      reason: string,
+      hinglish: string
+    ) => {
+      const asset = ASSETS[config.symbol];
+      const lotSize = config.fixedLotSize || 1.0;
+      const requiredMargin = Number(
+        (
+          (entryPrice * lotSize * (asset.pipSize < 0.01 ? 100 : 1)) /
+          50
+        ).toFixed(2)
+      );
+
+      if (paperAccount.freeMargin < requiredMargin) {
+        showToast(
+          `Margin call! Insufficient free margin ($${paperAccount.freeMargin.toFixed(2)})`
+        );
+        return;
+      }
+
+      const newPosition: PaperPosition = {
+        id: `POS-${Date.now().toString().slice(-5)}`,
+        symbol: config.symbol,
+        direction,
+        entryPrice,
+        currentPrice: entryPrice,
+        lotSize,
+        stopLoss: slPrice,
+        takeProfit: tpPrice,
+        openPnl: 0,
+        openPnlPercent: 0,
+        openedAt: new Date().toLocaleTimeString(),
+        marginUsed: requiredMargin,
+      };
+
+      setPositions((prev) => [newPosition, ...prev]);
+
+      setPaperAccount((prev) => ({
+        ...prev,
+        marginUsed: Number((prev.marginUsed + requiredMargin).toFixed(2)),
+        freeMargin: Number((prev.freeMargin - requiredMargin).toFixed(2)),
+      }));
+
+      // Audio Alert
+      if (direction === 'LONG') {
+        soundAlerts.playBuyTradeSound();
+      } else {
+        soundAlerts.playSellTradeSound();
+      }
+
+      setLatestBotAlert({
+        id: `alert-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString(),
+        direction,
+        symbol: config.symbol,
+        price: entryPrice,
+        stopLoss: slPrice,
+        takeProfit: tpPrice,
+        lotSize,
+        reason,
+        hinglishReason: hinglish,
+      });
+
+      addBotLog(
+        'EXECUTION',
+        `[PLANNED SETUP TRIGGERED] ${direction} ${lotSize} Lot @ ${entryPrice} on ${config.symbol}`,
+        `SL: ${slPrice} | TP: ${tpPrice} (1:${config.riskReward} R:R)`,
+        hinglish
+      );
+
+      showToast(
+        `🎯 Planned Setup Executed: ${direction} @ ${entryPrice} (SL: ${slPrice}, TP: ${tpPrice})`
+      );
+    },
+    [addBotLog, config, paperAccount.freeMargin, showToast]
+  );
+
   // Close Specific Paper Position manually
   const handleClosePosition = useCallback(
     (id: string) => {
@@ -559,25 +642,20 @@ export function App() {
         );
       }
 
-      // Check if bot should trigger autonomous trade
-      // Trigger trade if positions < 2 and random cadence hits every ~20-30s
-      if (positions.length < 2 && tickCounter.current % 8 === 0) {
-        const direction: TradeDirection = Math.random() > 0.4 ? 'LONG' : 'SHORT';
-        const lotSize = config.fixedLotSize || 1.0;
-
+      // Real market scanning: No blind or automated trades without confirmed trigger!
+      // Beginners can inspect the exact conditions in NextTradeOpportunityRadar and test on demand.
+      if (tickCounter.current % 6 === 0) {
         addBotLog(
-          'SIGNAL',
-          `High-Probability Setup Detected: ${direction} on ${config.symbol}!`,
-          `Institutional confluence confirmed. Triggering automated execution.`,
-          `Perfect entry pattern mila hai, bot abhi automatically trade execute karega.`
+          'INFO',
+          `[Filter Active] Neutral Range Chop Detected on ${config.symbol}`,
+          `Price is between support and resistance. Institutional volume below 1.35x.`,
+          `Abhi trade kyu nahi li: Price range ke beech me hai. False breakout se bachne ke liye bot discipline ke sath wait kar raha hai.`
         );
-
-        handleOpenPosition(direction, lotSize);
       }
     }, 3500);
 
     return () => clearInterval(botInterval);
-  }, [addBotLog, autoExecuteSignals, config, handleOpenPosition, positions.length]);
+  }, [addBotLog, autoExecuteSignals, config]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -660,6 +738,8 @@ export function App() {
               trades={backtestResult.trades}
               onUpdateConfig={handleUpdateConfig}
               onRunSimulation={handleRunBacktest}
+              currentPrice={currentPrice}
+              onTriggerPlannedTrade={handleTriggerPlannedTrade}
             />
           </div>
         )}
