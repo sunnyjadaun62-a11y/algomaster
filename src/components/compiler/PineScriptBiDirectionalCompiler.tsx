@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StrategyConfig } from '../../types';
-import { generatePineScript } from '../../generators/pineScriptGenerator';
+import { generatePineScript, PineScriptMode } from '../../generators/pineScriptGenerator';
 import { generatePythonBacktrader } from '../../generators/pythonBacktraderGenerator';
 import {
   Code2,
@@ -17,6 +17,10 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
+  Tv,
+  BellRing,
+  BarChart2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface PineScriptBiDirectionalCompilerProps {
@@ -30,6 +34,7 @@ export const PineScriptBiDirectionalCompiler: React.FC<PineScriptBiDirectionalCo
 }) => {
   const [activeTab, setActiveTab] = useState<'generator' | 'parser'>('generator');
   const [activeLang, setActiveLang] = useState<'pine' | 'python'>('pine');
+  const [pineMode, setPineMode] = useState<PineScriptMode>('indicator');
   const [copied, setCopied] = useState(false);
 
   // Reverse Parser State
@@ -40,12 +45,12 @@ export const PineScriptBiDirectionalCompiler: React.FC<PineScriptBiDirectionalCo
     extractedProps: string[];
   } | null>(null);
 
-  const pineCode = generatePineScript(config);
+  const pineCode = generatePineScript(config, pineMode);
   const pythonCode = generatePythonBacktrader(config);
   const activeCode = activeLang === 'pine' ? pineCode : pythonCode;
   const fileName =
     activeLang === 'pine'
-      ? `${config.model}_${config.symbol}_${config.timeframe}.pine`
+      ? `${config.model}_${config.symbol}_${pineMode === 'indicator' ? 'overlay' : 'strategy'}.pine`
       : `${config.model}_${config.symbol}.py`;
 
   const handleCopy = () => {
@@ -246,29 +251,59 @@ rsiVal = ta.rsi(close, rsiPeriod)
       {activeTab === 'generator' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <div className="flex items-center bg-white p-1 rounded-lg border border-slate-200">
-              <button
-                onClick={() => setActiveLang('pine')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  activeLang === 'pine'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                TradingView Pine Script v5
-              </button>
-              <button
-                onClick={() => setActiveLang('python')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  activeLang === 'python'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Terminal className="w-3.5 h-3.5" />
-                Python Backtrader
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center bg-white p-1 rounded-lg border border-slate-200">
+                <button
+                  onClick={() => setActiveLang('pine')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    activeLang === 'pine'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileCode className="w-3.5 h-3.5" />
+                  TradingView Pine Script v5
+                </button>
+                <button
+                  onClick={() => setActiveLang('python')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    activeLang === 'python'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  Python Backtrader
+                </button>
+              </div>
+
+              {/* Sub-modes for Pine Script: Live Overlay vs Strategy */}
+              {activeLang === 'pine' && (
+                <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg text-xs font-semibold">
+                  <button
+                    onClick={() => setPineMode('indicator')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
+                      pineMode === 'indicator'
+                        ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    <BellRing className="w-3 h-3" />
+                    Overlay & Live Alerts
+                  </button>
+                  <button
+                    onClick={() => setPineMode('strategy')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
+                      pineMode === 'strategy'
+                        ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    <BarChart2 className="w-3 h-3" />
+                    Strategy Backtester
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -302,6 +337,73 @@ rsiVal = ta.rsi(close, rsiPeriod)
               </button>
             </div>
           </div>
+
+          {/* Quick TradingView Deployment Instructions Card */}
+          {activeLang === 'pine' && (
+            <div className="p-4 bg-gradient-to-r from-indigo-50/90 via-sky-50/70 to-emerald-50/60 rounded-xl border border-indigo-200/80 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-indigo-200/50">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-600 text-white rounded-lg">
+                    <Tv className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      TradingView me Direct Live Run Karein (No Price Difference!)
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Zero Setup
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-600">
+                      TradingView ke official live chart pe overlay karne ke liye ye 4 simple steps follow karein:
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="https://in.tradingview.com/chart/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors shrink-0"
+                >
+                  Open TradingView <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
+                <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px] mb-1">
+                    Step 1
+                  </span>
+                  <p className="font-semibold text-slate-800">1-Click Copy Code</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Upar green button se script copy karein.</p>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px] mb-1">
+                    Step 2
+                  </span>
+                  <p className="font-semibold text-slate-800">Pine Editor Open Karein</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">TradingView ke bottom panel mein "Pine Editor" pe click karein.</p>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px] mb-1">
+                    Step 3
+                  </span>
+                  <p className="font-semibold text-slate-800">Paste Code (Ctrl+V)</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Editor mein Ctrl+A karke purana code hatayein aur paste karein.</p>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-lg border border-indigo-100/80">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] mb-1">
+                    Step 4
+                  </span>
+                  <p className="font-semibold text-slate-800">"Add to chart" Dabayein</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Instant live signals, EMA ribbon aur TP/SL chart par aa jayenge!</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Syntax Code Container */}
           <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-elevated overflow-hidden text-slate-100">
