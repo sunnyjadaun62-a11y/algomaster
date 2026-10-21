@@ -26,6 +26,7 @@ import {
   BotAlert,
   BotLogEntry,
 } from './components/bot/ExpertSentinelBotHUD';
+import { BotDecisionVisualizer } from './components/bot/BotDecisionVisualizer';
 
 // Core 4 Integrated Modules
 import { StrategyWorkflowBuilder } from './components/strategy/StrategyWorkflowBuilder';
@@ -48,6 +49,7 @@ export function App() {
   // 2. Sound & 24/7 AI Sentinel Bot State
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [autoExecuteSignals, setAutoExecuteSignals] = useState<boolean>(true); // Active 24/7 bot
+  const [showVisualizer, setShowVisualizer] = useState<boolean>(true); // Beginner visual roadmap
   const [latestBotAlert, setLatestBotAlert] = useState<BotAlert | null>(null);
   const [botLogs, setBotLogs] = useState<BotLogEntry[]>([
     {
@@ -619,7 +621,19 @@ export function App() {
           latestAlert={latestBotAlert}
           onDismissAlert={() => setLatestBotAlert(null)}
           onManualTriggerBot={(dir) => handleOpenPosition(dir, config.fixedLotSize || 1.0)}
+          showVisualizer={showVisualizer}
+          onToggleVisualizer={() => setShowVisualizer(!showVisualizer)}
         />
+
+        {/* Beginner Visual Roadmap: Kb Bot Enter Karega, Kitna Profit Leke Niklega, aur Kb Trade Nahi Lega */}
+        {showVisualizer && (
+          <BotDecisionVisualizer
+            config={config}
+            currentPrice={currentPrice}
+            priceDelta={priceDelta}
+            onSimulateSignal={(dir) => handleOpenPosition(dir, config.fixedLotSize || 1.0)}
+          />
+        )}
 
         {/* MODULE 1: VISUAL STRATEGY WORKFLOW BUILDER & EDITOR */}
         {activeTab === 'workflow' && (

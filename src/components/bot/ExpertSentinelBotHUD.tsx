@@ -58,6 +58,8 @@ interface ExpertSentinelBotHUDProps {
   latestAlert: BotAlert | null;
   onDismissAlert: () => void;
   onManualTriggerBot: (direction: TradeDirection) => void;
+  showVisualizer?: boolean;
+  onToggleVisualizer?: () => void;
 }
 
 export const ExpertSentinelBotHUD: React.FC<ExpertSentinelBotHUDProps> = ({
@@ -72,6 +74,8 @@ export const ExpertSentinelBotHUD: React.FC<ExpertSentinelBotHUDProps> = ({
   latestAlert,
   onDismissAlert,
   onManualTriggerBot,
+  showVisualizer = true,
+  onToggleVisualizer,
 }) => {
   const [showLogs, setShowLogs] = useState(false);
   const isNeeraj = config.model === 'neeraj-15m';
@@ -194,6 +198,21 @@ export const ExpertSentinelBotHUD: React.FC<ExpertSentinelBotHUDProps> = ({
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               )}
             </button>
+
+            {/* Entry & Profit Roadmap Toggle */}
+            {onToggleVisualizer && (
+              <button
+                onClick={onToggleVisualizer}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-sm ${
+                  showVisualizer
+                    ? 'bg-gradient-to-r from-teal-500 to-indigo-600 text-white border-teal-400/80 shadow-teal-500/20'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-teal-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-teal-300" />
+                <span>Profit Target Roadmap ({showVisualizer ? 'Hide' : 'Show'})</span>
+              </button>
+            )}
           </div>
         </div>
 
