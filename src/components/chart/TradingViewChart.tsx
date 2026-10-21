@@ -6,6 +6,7 @@ import {
   CandlestickSeries,
   BarSeries,
   HistogramSeries,
+  LineSeries,
   LineStyle,
   ColorType,
   UTCTimestamp,
@@ -50,6 +51,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
+  const [showEma9, setShowEma9] = useState<boolean>(true);
+  const [showEma21, setShowEma21] = useState<boolean>(true);
+  const [showSmc, setShowSmc] = useState<boolean>(true);
 
   // Initialize and update Lightweight Chart
   useEffect(() => {
@@ -160,8 +164,105 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     volumeSeries.setData(volumeData);
     volumeSeriesRef.current = volumeSeries;
 
-    // 3. Add Trade Invalidation & Target Price Lines (SL / TP)
+    // 2a. Add EMA 9 Line Series (Fast Trend Compass)
+    if (showEma9) {
+      const ema9Series = chart.addSeries(LineSeries, {
+        color: '#0284c7', // Sky Blue
+        lineWidth: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: true,
+        title: 'EMA 9 (Fast)',
+      });
+      const ema9Data = candles
+        .filter((c) => c.emaFast !== undefined)
+        .map((c) => ({
+          time: Math.floor(c.timestamp / 1000) as UTCTimestamp,
+          value: c.emaFast!,
+        }));
+      if (ema9Data.length > 0) {
+        ema9Series.setData(ema9Data);
+      }
+    }
+
+    // 2b. Add EMA 21 Line Series (Slow Baseline Trend)
+    if (showEma21) {
+      const ema21Series = chart.addSeries(LineSeries, {
+        color: '#f59e0b', // Amber Orange
+        lineWidth: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: true,
+        title: 'EMA 21 (Slow)',
+      });
+      const ema21Data = candles
+        .filter((c) => c.emaSlow !== undefined)
+        .map((c) => ({
+          time: Math.floor(c.timestamp / 1000) as UTCTimestamp,
+          value: c.emaSlow!,
+        }));
+      if (ema21Data.length > 0) {
+        ema21Series.setData(ema21Data);
+      }
+    }
+
+    // 2c. Add Smart Money Concepts (SMC) Overlays (Order Block, Liquidity Sweep, CHoCH)
     priceLinesRef.current = [];
+    if (showSmc && series && candles.length > 5) {
+      const recentCandles = candles.slice(-25);
+      const recentHigh = Math.max(...recentCandles.map((c) => c.high));
+      const recentLow = Math.min(...recentCandles.map((c) => c.low));
+
+      const obCandles = candles.filter((c) => c.orderBlock);
+      const latestOB = obCandles[obCandles.length - 1]?.orderBlock || {
+        type: 'BULLISH',
+        top: Number((recentLow * 1.003).toFixed(symbol === 'EURUSD' ? 4 : 2)),
+        bottom: recentLow,
+      };
+
+      // Bullish Order Block (Demand / Institutional Re-entry Zone)
+      const obTopLine = series.createPriceLine({
+        price: latestOB.top,
+        color: '#10b981',
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: '🟢 Order Block Zone (Demand)',
+      });
+      priceLinesRef.current.push(obTopLine);
+
+      const obBottomLine = series.createPriceLine({
+        price: latestOB.bottom,
+        color: '#059669',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'OB Invalidation (SL)',
+      });
+      priceLinesRef.current.push(obBottomLine);
+
+      // Liquidity Sweep Level (Retail Trap Line)
+      const sweepLine = series.createPriceLine({
+        price: recentHigh,
+        color: '#ec4899',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: '⚡ Liquidity Sweep Level (Retail Trap)',
+      });
+      priceLinesRef.current.push(sweepLine);
+
+      // CHoCH / BOS (Trend Change Line)
+      const chochLine = series.createPriceLine({
+        price: Number(((recentHigh + recentLow) / 2).toFixed(symbol === 'EURUSD' ? 4 : 2)),
+        color: '#8b5cf6',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: '🔄 CHoCH (Trend Shift Line)',
+      });
+      priceLinesRef.current.push(chochLine);
+    }
+
+    // 3. Add Trade Invalidation & Target Price Lines (SL / TP)
     const targetTrade = activeTrade || (trades.length > 0 ? trades[trades.length - 1] : null);
 
     if (targetTrade && series) {
@@ -270,7 +371,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         chartRef.current = null;
       }
     };
-  }, [candles, chartType, height, activeTrade, trades, symbol]);
+  }, [candles, chartType, height, activeTrade, trades, symbol, showEma9, showEma21, showSmc]);
 
   const latestCandle = candles[candles.length - 1];
   const displayCandle = hoveredCandle || latestCandle;
@@ -296,7 +397,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           </div>
 
           {displayCandle && (
-            <div className="flex items-center gap-2 font-mono text-[11px] text-slate-500">
+            <div className="flex flex-wrap items-center gap-2.5 font-mono text-[11px] text-slate-500">
               <span>
                 O: <span className="font-semibold text-slate-800">{displayCandle.open}</span>
               </span>
@@ -312,12 +413,64 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
                   {displayCandle.close}
                 </span>
               </span>
+              {displayCandle.emaFast && (
+                <span className="text-sky-600 font-semibold border-l border-slate-200 pl-2">
+                  EMA9: {displayCandle.emaFast}
+                </span>
+              )}
+              {displayCandle.emaSlow && (
+                <span className="text-amber-600 font-semibold">
+                  EMA21: {displayCandle.emaSlow}
+                </span>
+              )}
+              {displayCandle.rsi && (
+                <span className="text-teal-600 font-semibold">
+                  RSI: {displayCandle.rsi}
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Right: Candlestick vs Bar Chart Toggle + Zoom */}
-        <div className="flex items-center space-x-2">
+        {/* Right: Overlay Toggles + Candlestick vs Bar Chart Toggle + Zoom */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Overlay Indicators Toggles */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+            <button
+              onClick={() => setShowEma9(!showEma9)}
+              className={`px-2 py-1 rounded transition-all flex items-center gap-1 ${
+                showEma9
+                  ? 'bg-sky-50 text-sky-700 border border-sky-300 font-bold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+              EMA 9
+            </button>
+            <button
+              onClick={() => setShowEma21(!showEma21)}
+              className={`px-2 py-1 rounded transition-all flex items-center gap-1 ${
+                showEma21
+                  ? 'bg-amber-50 text-amber-700 border border-amber-300 font-bold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              EMA 21
+            </button>
+            <button
+              onClick={() => setShowSmc(!showSmc)}
+              className={`px-2 py-1 rounded transition-all flex items-center gap-1 ${
+                showSmc
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              SMC Zones
+            </button>
+          </div>
+
           {/* Chart Type Selector */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-lg">
             <button
@@ -360,20 +513,43 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         <div ref={chartContainerRef} className="w-full h-full" />
 
         {/* Overlay Legend Badge */}
-        <div className="absolute top-3 left-3 pointer-events-none z-10 flex items-center gap-2 bg-white/85 backdrop-blur px-2.5 py-1 rounded-md border border-slate-200 text-[10px] font-medium text-slate-600 shadow-sm">
-          <span className="flex items-center gap-1">
+        <div className="absolute top-3 left-3 pointer-events-none z-10 flex flex-wrap items-center gap-2.5 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-medium text-slate-700 shadow-sm">
+          {showEma9 && (
+            <span className="flex items-center gap-1 font-semibold text-sky-700">
+              <span className="w-2.5 h-1 rounded bg-sky-500"></span>
+              EMA 9 (Fast)
+            </span>
+          )}
+          {showEma21 && (
+            <span className="flex items-center gap-1 font-semibold text-amber-700">
+              <span className="w-2.5 h-1 rounded bg-amber-500"></span>
+              EMA 21 (Slow)
+            </span>
+          )}
+          {showSmc && (
+            <>
+              <span className="flex items-center gap-1 font-semibold text-emerald-700">
+                <span className="w-2 h-2 rounded bg-emerald-500"></span>
+                Order Block (Demand)
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-pink-600">
+                <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                Liquidity Sweep
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-purple-600">
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                CHoCH Line
+              </span>
+            </>
+          )}
+          <span className="text-slate-300">|</span>
+          <span className="flex items-center gap-1 text-emerald-700 font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Take Profit Level
+            Take Profit
           </span>
-          <span className="text-slate-300">•</span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-rose-700 font-semibold">
             <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-            Stop Loss Level
-          </span>
-          <span className="text-slate-300">•</span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-            Entry Level
+            Stop Loss
           </span>
         </div>
       </div>

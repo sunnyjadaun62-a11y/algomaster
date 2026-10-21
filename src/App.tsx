@@ -15,6 +15,7 @@ import { ASSETS } from './data/assets';
 import { STRATEGY_PRESETS } from './data/presets';
 import { generateCandles } from './engine/dataFeed';
 import { runBacktest, BacktestResult } from './engine/backtestEngine';
+import { fetchBinanceKlines, RealMarketStatus } from './engine/realMarketFeed';
 import { soundAlerts } from './utils/audioAlerts';
 
 import { Header } from './components/layout/Header';
@@ -50,6 +51,8 @@ export function App() {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [autoExecuteSignals, setAutoExecuteSignals] = useState<boolean>(true); // Active 24/7 bot
   const [showVisualizer, setShowVisualizer] = useState<boolean>(true); // Beginner visual roadmap
+  const [isRealMarket, setIsRealMarket] = useState<boolean>(false); // Real Binance Market API
+  const [realMarketStatus, setRealMarketStatus] = useState<RealMarketStatus | null>(null);
   const [latestBotAlert, setLatestBotAlert] = useState<BotAlert | null>(null);
   const [botLogs, setBotLogs] = useState<BotLogEntry[]>([
     {
@@ -181,8 +184,9 @@ export function App() {
     [addBotLog, showToast]
   );
 
-  // When symbol or timeframe changes, refresh candles & price
+  // When symbol or timeframe changes, refresh candles & price (Simulated Mode)
   useEffect(() => {
+    if (isRealMarket) return;
     const asset = ASSETS[config.symbol];
     if (asset) {
       setCurrentPrice(asset.basePrice);
@@ -191,7 +195,49 @@ export function App() {
     setCandles(newCandles);
     const res = runBacktest(newCandles, config, 25000);
     setBacktestResult(res);
-  }, [config.symbol, config.timeframe]);
+  }, [config.symbol, config.timeframe, isRealMarket]);
+
+  // Real Market Data Feed: Fetches live Binance klines directly via REST API
+  useEffect(() => {
+    if (!isRealMarket) return;
+
+    let isMounted = true;
+    const loadRealData = async () => {
+      try {
+        const { candles: realCandles, status } = await fetchBinanceKlines(
+          config.symbol === 'BTCUSDT' ? 'BTCUSDT' : 'BTCUSDT',
+          config.timeframe,
+          160
+        );
+        if (!isMounted) return;
+        setCandles(realCandles);
+        setRealMarketStatus(status);
+        const latest = realCandles[realCandles.length - 1];
+        if (latest) {
+          setCurrentPrice(latest.close);
+          setPriceDelta(status.priceChangePercent24h);
+        }
+        setBacktestResult(runBacktest(realCandles, config, 25000));
+      } catch (err) {
+        console.warn('Real market feed fetch error:', err);
+      }
+    };
+
+    loadRealData();
+    showToast('Connected to Real Live Binance Exchange Feed (BTCUSDT) 🟢');
+    addBotLog(
+      'INFO',
+      'Real Live Market Feed Connected (Binance Public API)',
+      `Streaming actual live klines and order book volume for BTCUSDT (${config.timeframe}). Zero simulation.`,
+      'Binance real market se live data connect ho gaya hai. Ab aap real market ticks dekh rahe hain!'
+    );
+
+    const interval = setInterval(loadRealData, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isRealMarket, config.symbol, config.timeframe, addBotLog, config, showToast]);
 
   // Execute Backtest
   const handleRunBacktest = useCallback(() => {
@@ -740,6 +786,9 @@ export function App() {
               onRunSimulation={handleRunBacktest}
               currentPrice={currentPrice}
               onTriggerPlannedTrade={handleTriggerPlannedTrade}
+              isRealMarket={isRealMarket}
+              onToggleRealMarket={setIsRealMarket}
+              realMarketStatus={realMarketStatus}
             />
           </div>
         )}

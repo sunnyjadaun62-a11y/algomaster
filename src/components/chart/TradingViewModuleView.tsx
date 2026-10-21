@@ -3,6 +3,8 @@ import { AssetSymbol, Candle, StrategyConfig, Timeframe, Trade, TradeDirection }
 import { ASSETS, formatPrice } from '../../data/assets';
 import { TradingViewChart } from './TradingViewChart';
 import { NextTradeOpportunityRadar } from '../learning/NextTradeOpportunityRadar';
+import { SituationalAdviceCoach } from '../bot/SituationalAdviceCoach';
+import { ChartReadingAcademy } from '../learning/ChartReadingAcademy';
 import {
   CandlestickChart,
   BarChart3,
@@ -18,6 +20,9 @@ import {
   ShieldAlert,
   Flame,
   Crown,
+  GraduationCap,
+  Globe,
+  Radio,
 } from 'lucide-react';
 
 interface TradingViewModuleViewProps {
@@ -35,6 +40,9 @@ interface TradingViewModuleViewProps {
     reason: string,
     hinglish: string
   ) => void;
+  isRealMarket: boolean;
+  onToggleRealMarket: (val: boolean) => void;
+  realMarketStatus?: any;
 }
 
 export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
@@ -45,8 +53,12 @@ export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
   onRunSimulation,
   currentPrice,
   onTriggerPlannedTrade,
+  isRealMarket,
+  onToggleRealMarket,
+  realMarketStatus,
 }) => {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [showAcademy, setShowAcademy] = useState(false);
 
   const assetList: AssetSymbol[] = ['NIFTY50', 'XAUUSD', 'BTCUSDT', 'EURUSD', 'BANKNIFTY'];
   const timeframeList: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -111,23 +123,63 @@ export const TradingViewModuleView: React.FC<TradingViewModuleViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Active Model Badge */}
-        <div className="flex items-center gap-2">
-          <div
-            className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
-              isNeeraj
-                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                : 'bg-teal-50 text-teal-800 border-teal-200'
+        {/* Right: Data Source Selector & Academy Toggle */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Data Source Selector */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+            <button
+              onClick={() => onToggleRealMarket(false)}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                !isRealMarket
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              ⚡ Simulated Engine
+            </button>
+            <button
+              onClick={() => {
+                onToggleRealMarket(true);
+                onUpdateConfig({ symbol: 'BTCUSDT' });
+              }}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                isRealMarket
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-emerald-700'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              <span>Real Live Binance Feed</span>
+            </button>
+          </div>
+
+          {/* Toggle Academy Guide Button */}
+          <button
+            onClick={() => setShowAcademy(!showAcademy)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              showAcademy
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
             }`}
           >
-            {isNeeraj ? <Flame className="w-3.5 h-3.5 text-amber-500" /> : <Crown className="w-3.5 h-3.5 text-teal-600" />}
-            <span>{isNeeraj ? 'Neeraj 15M Scalping' : 'Gold 15M CHoCH'}</span>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">1:{config.riskReward} R:R</span>
+            <GraduationCap className="w-4 h-4" />
+            <span>{showAcademy ? 'Hide Academy' : 'Chart Reading Academy'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Lightweight Charts Embed */}
+      {/* 1. Bot's Real-Time Situational Coach & Entry/Exit Advice */}
+      <SituationalAdviceCoach
+        config={config}
+        currentPrice={currentPrice}
+        candles={candles}
+        isRealMarket={isRealMarket}
+      />
+
+      {/* 2. Beginner Chart Reading & SMC Academy (When Opened) */}
+      {showAcademy && <ChartReadingAcademy />}
+
+      {/* 3. Main Lightweight Charts Embed with EMA 9/21 and SMC Overlays */}
       <TradingViewChart
         candles={candles}
         symbol={config.symbol}
