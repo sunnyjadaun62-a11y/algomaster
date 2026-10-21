@@ -60,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <div className="bg-white border-b border-slate-200 shadow-sm sticky top-16 z-30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <nav className="flex space-x-1.5 sm:space-x-3 lg:space-x-5 overflow-x-auto py-2.5">
             {tabs.map((tab) => {
